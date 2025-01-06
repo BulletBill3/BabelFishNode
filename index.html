@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Translater</title>
+    <meta name="viewport">
+    <link rel="icon" type="image/x-icon" href="C:\Users\olsen\OneDrive\Documents\School\Spring 2023\Web 3\efav.ico">
+    <style>
+      body { margin: 0; padding-bottom: 3rem; font-family: Helvetica; }
+      h1 {text-align: center;}
+      #form { background: rgba(0, 0, 0, 0.15); padding: 0.25rem; position: fixed; bottom: 0; left: 0; right: 0; height: 8rem; box-sizing: border-box; backdrop-filter: blur(10px); text-align: center;}
+      #input { border: none; padding: 0 1rem; flex-grow: 1; border-radius: 2rem; margin: 0.25rem; }
+      #input:focus { outline: none; }
+        button { background: #333333; border: none; padding: 0 1rem; margin: 0.25rem; border-radius: 3px; outline: none; color: #fff; }  
+      #title {background: rgba(0, 0, 0, 0.15); padding: 0.25rem;  box-sizing: border-box; backdrop-filter: blur(10px); }
+      button{
+        padding:10px;
+        background-color:red;
+      }
+      #messages { list-style-type: none; margin: 20px; padding: 0; }
+      #messages > li { padding: 0.5rem 1rem; }
+      #messages > li:nth-child(odd) { background: #efefef; }
+
+      .card {background-color: yellow;}
+      #stop{margin:5px;}
+
+    </style>
+    <!-- <link rel="icon" type="image/x-icon" href="C:\Users\olsen\OneDrive\Documents\School\Spring 2023\Web 3\efav.ico"> -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+  </head>
+  <body>
+   <div id="title"><h1>Messages</h1></div> 
+    <ul id="messages"></ul>
+    <form id="form" >
+      <p id="alerts"></p>
+  
+      <select id="language-select" name="language">
+        <option value="en">English to Spanish</option>
+        <option value="es">Español a ingles</option>
+      </select> &nbsp;<button class="btn btn-dark btn-lg" id="record">record</button><button class="btn btn-dark btn-lg" id="stop">stop</button>
+    </form>
+    
+    
+    <script src="/socket.io/socket.io.js"></script>
+    
+
+    <script>
+      var socket = io();
+
+      var messages = document.getElementById('messages');
+      var form = document.getElementById('form');
+      var input = document.getElementById('input');
+      var alerts = document.getElementById('alerts');
+      var record = document.getElementById('record');
+      var stop = document.getElementById('stop');
+      var lang = document.getElementById('language-select')
+  
+      stop.disabled = true;
+
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (input.value) {
+          socket.emit('chat message', input.value);
+          input.value = '';
+        }
+      });
+
+      socket.on('audio message', function(msg) {
+        console.log("wtf"+ msg)
+
+        const blob = new Blob( [msg] , {type: 'audio/webm;codecs=opus'} );
+
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        const audioURL = window.URL.createObjectURL(blob);
+        audio.src = audioURL;
+
+        const allsec = document.getElementsByTagName('section');
+        var lastsec = allsec[allsec.length - 1]
+        //lastsec.innerHTML = '<audio controls src="'+audio.src+'"></audio>';
+        lastsec.appendChild(audio);
+        //messages.appendChild(audio); 
+        
+        console.log(blob);
+      
+      });
+
+        socket.on('chat message', function(msg) {
+        var item = document.createElement('li');
+        item.innerHTML = `
+        <div class="card col-6" style="">
+          <div class="card-body">
+            <p class="card-text">` + msg + `</p>
+            <section></section>
+          </div>
+        </div>`;
+
+        //item.textContent = msg;
+        messages.appendChild(item);
+        window.scrollTo(0, document.body.scrollHeight);
+        stop.disabled = false;
+      });
+      //let mediaRecorder;
+
+      navigator.mediaDevices
+        .getUserMedia({audio:true})
+        .then((stream)=>{
+          const mediaRecorder = new MediaRecorder(stream);
+
+          record.onclick = (e) => {
+            mediaRecorder.start();
+            speechEn();
+            console.log(mediaRecorder.state);
+            console.log("recorder started");;
+            record.disabled =true;
+            
+          }
+
+          stop.onclick = (e) => {
+            mediaRecorder.stop();
+            console.log(mediaRecorder.state);
+            console.log("recorder stopped");
+            stop.disabled = true;
+            record.disabled = false;
+          }
+
+
+          mediaRecorder.onstop = (e) => {
+            console.log("data available after MediaRecorder.stop() called.");
+
+  
+          };
+
+          mediaRecorder.ondataavailable = (e) => {
+            console.log(e.data);
+
+
+            const audio = document.createElement("audio");
+            audio.controls = true;
+            const blob = new Blob([e.data], { type: "audio/ogg; codecs=opus"});
+            console.log('id?')
+            console.log(blob)
+            const audioURL = window.URL.createObjectURL(blob);
+            audio.src = audioURL;
+            console.log("recorder stopped");
+            socket.emit('audio message', blob);
+            //messages.appendChild(audio);
+          };
+
+        })
+
+      var enText = document.getElementById("enText");
+      var esText = document.getElementById("esText");
+
+      voices = window.speechSynthesis.getVoices();
+
+      function speechEn() {
+ 
+
+        var SpeechRecognition = SpeechRecognition || webkitSpeechRecognition;
+        var recognition = new SpeechRecognition();
+
+    
+      recognition.onstart = function () {
+          alerts.innerHTML = "listening...";
+        
+      };
+
+      recognition.onspeechend = function () {
+          alerts.innerHTML = "stopped listening";
+          recognition.stop();
+      }
+
+      recognition.onresult = function (event) {
+          var transcript = event.results[0][0].transcript;
+          enToEs(transcript);
+      };
+
+    recognition.start();
+}
+
+
+function enToEs(text) {
+  console.log(lang.value)
+  let url = ''
+
+  if(lang.value == 'en'){
+    url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=es&dt=t&q='+encodeURI(text);
+  }
+  else{
+    url = 'https://translate.googleapis.com/translate_a/single?client=gtx&sl=es&tl=en&dt=t&q='+encodeURI(text);
+  }  
+   
+  axios.get(url).then(function (response) {
+    var str =  text +": \n\n"+response.data[0][0][0];
+    console.log(str)
+    socket.emit('chat message', str)
+  });
+    
+  }
+
+
+  </script>
+  </body>
+
+</html>
